@@ -160,6 +160,8 @@ class MLBackend(models.Model):
 
     def has_permission(self, user):
         user.project = self.project  # link for activity log
+        if user.is_superuser is True or self.project.created_by == user:
+            return True
         return self.project.has_permission(user)
 
     @staticmethod

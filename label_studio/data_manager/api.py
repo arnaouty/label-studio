@@ -19,7 +19,7 @@ from data_manager.serializers import (
     ViewSerializer,
 )
 from django.conf import settings
-from django.db.models import Sum
+from django.db.models import Sum, Q
 from django.db.models.functions import Coalesce
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
@@ -202,7 +202,9 @@ class ViewAPI(viewsets.ModelViewSet):
         return Response(status=200)
 
     def get_queryset(self):
-        return View.objects.filter(project__organization=self.request.user.active_organization).order_by('order', 'id')
+        if self.request.user.is_superuser is True:
+            return View.objects.all().order_by('order', 'id')
+        return View.objects.filter(Q(project__created_by=self.request.user) | Q(project__members__user=self.request.user)).order_by('order', 'id')
 
 
 class TaskPagination(PageNumberPagination):

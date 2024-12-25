@@ -174,7 +174,11 @@ class TaskListAPI(DMTaskListAPI):
 
     def filter_queryset(self, queryset):
         queryset = super().filter_queryset(queryset)
-        return queryset.filter(project__organization=self.request.user.active_organization)
+
+        if self.request.user.is_superuser:
+            return queryset
+
+        return queryset.filter(Q(project__memebers__user=self.request.user) | Q(project__created_by=self.request.user))
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
@@ -616,6 +620,7 @@ class AnnotationDraftListAPI(generics.ListCreateAPIView):
 
     def filter_queryset(self, queryset):
         task_id = self.kwargs['pk']
+
         return queryset.filter(task_id=task_id)
 
     def perform_create(self, serializer):

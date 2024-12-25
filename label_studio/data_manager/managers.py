@@ -753,4 +753,4 @@ class PreparedTaskManager(models.Manager):
 
 class TaskManager(models.Manager):
     def for_user(self, user):
-        return self.filter(project__organization=user.active_organization)
+        return self.filter(Q(project__memebers__user=user) | Q(project__created_by=user))

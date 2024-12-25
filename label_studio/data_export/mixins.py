@@ -37,6 +37,8 @@ logger = logging.getLogger(__name__)
 class ExportMixin:
     def has_permission(self, user):
         user.project = self.project  # link for activity log
+        if user.is_superuser is True or self.project.created_by == user:
+            return True
         return self.project.has_permission(user)
 
     def get_default_title(self):

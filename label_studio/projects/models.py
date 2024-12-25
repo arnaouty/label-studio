@@ -82,7 +82,10 @@ class ProjectManager(models.Manager):
     }
 
     def for_user(self, user):
-        return self.filter(organization=user.active_organization)
+        return self.filter(
+            # Q(organization=user.active_organization) |
+            Q(created_by=user) | Q(
+                members__user=user))
 
     def with_counts(self, fields=None):
         return self.with_counts_annotate(self, fields=fields)
@@ -403,14 +406,18 @@ class Project(ProjectMixin, models.Model):
         return created
 
     def has_collaborator(self, user):
+        if user.is_superuser is True or self.project.created_by == user:
+            return True
         return ProjectMember.objects.filter(user=user, project=self).exists()
 
     def has_collaborator_enabled(self, user):
+        if user.is_superuser is True or self.project.created_by == user:
+            return True
         membership = ProjectMember.objects.filter(user=user, project=self)
         return membership.exists() and membership.first().enabled
 
     def _update_tasks_states(
-        self, maximum_annotations_changed, overlap_cohort_percentage_changed, tasks_number_changed
+            self, maximum_annotations_changed, overlap_cohort_percentage_changed, tasks_number_changed
     ):
         """
         Update tasks states after settings change
@@ -1121,7 +1128,7 @@ class LabelStreamHistory(models.Model):
 class ProjectMember(models.Model):
 
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='project_memberships', help_text='User ID'
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='members', help_text='User ID'
     )
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='members', help_text='Project ID')
     enabled = models.BooleanField(default=True, help_text='Project member is enabled')
@@ -1157,6 +1164,8 @@ class ProjectSummary(models.Model):
 
     def has_permission(self, user):
         user.project = self.project  # link for activity log
+        if user.is_superuser is True or self.project.created_by == user:
+            return True
         return self.project.has_permission(user)
 
     def reset(self, tasks_data_based=True):

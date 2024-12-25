@@ -345,6 +345,8 @@ class Task(TaskMixin, models.Model):
         mixin_has_permission = cast(bool, super().has_permission(user))
 
         user.project = self.project  # link for activity log
+        if user.is_superuser is True or self.project.created_by == user:
+            return True
         return mixin_has_permission and self.project.has_permission(user)
 
     def clear_expired_locks(self):
@@ -561,7 +563,9 @@ post_bulk_create = Signal()   # providing args 'objs' and 'batch_size'
 
 class AnnotationManager(models.Manager):
     def for_user(self, user):
-        return self.filter(project__organization=user.active_organization)
+        if user.is_superuser :
+            return self.get_queryset()
+        return self.filter(Q(project__memebers__user=user) | Q(project__created_by=user))
 
     def bulk_create(self, objs, batch_size=None):
         pre_bulk_create.send(sender=self.model, objs=objs, batch_size=batch_size)
@@ -718,6 +722,8 @@ class Annotation(AnnotationMixin, models.Model):
         mixin_has_permission = cast(bool, super().has_permission(user))
 
         user.project = self.project  # link for activity log
+        if user.is_superuser is True or self.project.created_by == user:
+            return True
         return mixin_has_permission and self.project.has_permission(user)
 
     def increase_project_summary_counters(self):

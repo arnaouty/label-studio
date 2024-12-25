@@ -3,6 +3,7 @@
 from collections import OrderedDict
 
 import ujson as json
+from django.db.models import Q
 from drf_dynamic_fields import DynamicFieldsMixin
 from organizations.models import Organization, OrganizationMember
 from rest_framework import serializers
@@ -37,7 +38,7 @@ class UserSerializerWithProjects(UserSerializer):
             return None
 
         current_user = self.context['request'].user
-        projects = user.annotations.filter(project__organization=current_user.active_organization).values(
+        projects = user.annotations.filter(Q(project__members__user=current_user) | Q(project__created_by=current_user)).values(
             'project__id', 'project__title'
         )
         contributed_to = [(json.dumps({'id': p['project__id'], 'title': p['project__title']}), 0) for p in projects]
@@ -57,14 +58,14 @@ class NewUserSerializer(UserSerializer):
             return None
 
         current_user = self.context['request'].user
-        return user.created_projects.filter(organization=current_user.active_organization).values('id', 'title')
+        return user.created_projects.filter(Q(project__members__user=current_user) | Q(project__created_by=current_user)).values('id', 'title')
 
     def get_contributed_to_projects(self, user):
         if not self.context.get('contributed_to_projects', False):
             return None
 
         current_user = self.context['request'].user
-        projects = user.annotations.filter(project__organization=current_user.active_organization).values(
+        projects = user.annotations.filter(Q(project__members__user=current_user) | Q(project__created_by=current_user)).values(
             'project__id', 'project__title'
         )
         contributed_to = [(json.dumps({'id': p['project__id'], 'title': p['project__title']}), 0) for p in projects]
@@ -103,8 +104,8 @@ class OrganizationMemberSerializer(DynamicFieldsMixin, serializers.ModelSerializ
     contributed_projects_count = serializers.SerializerMethodField(read_only=True)
 
     def get_annotations_count(self, member):
-        org = self.context.get('organization')
-        return member.user.annotations.filter(project__organization=org).count()
+        # org = self.context.get('organization')
+        return member.user.annotations.filter(Q(project__memebers__user=member.user) | Q(project__created_by=member.user)).count()
 
     def get_contributed_projects_count(self, member):
         org = self.context.get('organization')

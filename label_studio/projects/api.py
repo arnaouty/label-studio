@@ -16,7 +16,7 @@ from core.utils.io import find_dir, find_file, read_yaml
 from data_manager.functions import filters_ordering_selected_items_exist, get_prepared_queryset
 from django.conf import settings
 from django.db import IntegrityError
-from django.db.models import F
+from django.db.models import F, Q
 from django.http import Http404
 from django.utils.decorators import method_decorator
 from django_filters import CharFilter, FilterSet
@@ -166,10 +166,10 @@ _project_schema = openapi.Schema(
         'control_weights': openapi.Schema(
             title='control_weights',
             description='Dict of weights for each control tag in metric calculation. Each control tag (e.g. label or choice) will '
-            'have its own key in control weight dict with weight for each label and overall weight. '
-            'For example, if a bounding box annotation with a control tag named my_bbox should be included with 0.33 weight in agreement calculation, '
-            'and the first label Car should be twice as important as Airplane, then you need to specify: '
-            "{'my_bbox': {'type': 'RectangleLabels', 'labels': {'Car': 1.0, 'Airplane': 0.5}, 'overall': 0.33}",
+                        'have its own key in control weight dict with weight for each label and overall weight. '
+                        'For example, if a bounding box annotation with a control tag named my_bbox should be included with 0.33 weight in agreement calculation, '
+                        'and the first label Car should be twice as important as Airplane, then you need to specify: '
+                        "{'my_bbox': {'type': 'RectangleLabels', 'labels': {'Car': 1.0, 'Airplane': 0.5}, 'overall': 0.33}",
             type=openapi.TYPE_OBJECT,
             example={
                 'my_bbox': {'type': 'RectangleLabels', 'labels': {'Car': 1.0, 'Airplaine': 0.5}, 'overall': 0.33}
@@ -252,11 +252,19 @@ class ProjectListAPI(generics.ListCreateAPIView):
         serializer.is_valid(raise_exception=True)
         fields = serializer.validated_data.get('include')
         filter = serializer.validated_data.get('filter')
-        projects = Project.objects.filter(organization=self.request.user.active_organization).order_by(
-            F('pinned_at').desc(nulls_last=True), '-created_at'
-        )
+        if self.request.user.is_superuser is True:
+            projects = Project.objects.order_by(F('pinned_at').desc(nulls_last=True), '-created_at')
+        else:
+            projects = (Project.objects.filter(
+                # Q(organization=self.request.user.active_organization) |
+                Q(created_by=self.request.user) | Q(members__user=self.request.user))
+            .order_by(
+                F('pinned_at').desc(nulls_last=True), '-created_at'
+            ))
+
         if filter in ['pinned_only', 'exclude_pinned']:
             projects = projects.filter(pinned_at__isnull=filter == 'exclude_pinned')
+
         return ProjectManager.with_counts_annotate(projects, fields=fields).prefetch_related('members', 'created_by')
 
     def get_serializer_context(self):
@@ -309,7 +317,10 @@ class ProjectCountsListAPI(generics.ListAPIView):
         serializer = GetFieldsSerializer(data=self.request.query_params)
         serializer.is_valid(raise_exception=True)
         fields = serializer.validated_data.get('include')
-        return Project.objects.with_counts(fields=fields).filter(organization=self.request.user.active_organization)
+        return Project.objects.with_counts(fields=fields).filter(
+            # Q(organization=self.request.user.active_organization) |
+            Q(created_by=self.request.user) | Q(
+                members__user=self.request.user))
 
 
 @method_decorator(
@@ -423,7 +434,10 @@ class ProjectAPI(generics.RetrieveUpdateDestroyAPIView):
         serializer = GetFieldsSerializer(data=self.request.query_params)
         serializer.is_valid(raise_exception=True)
         fields = serializer.validated_data.get('include')
-        return Project.objects.with_counts(fields=fields).filter(organization=self.request.user.active_organization)
+        return Project.objects.with_counts(fields=fields).filter(
+            # Q(organization=self.request.user.active_organization) |
+            Q(created_by=self.request.user) | Q(
+                members__user=self.request.user))
 
     def get(self, request, *args, **kwargs):
         return super(ProjectAPI, self).get(request, *args, **kwargs)
@@ -720,14 +734,14 @@ class ProjectReimportAPI(generics.RetrieveAPIView):
             settings.HOSTNAME or 'https://localhost:8080'
         ),
         manual_parameters=[
-            openapi.Parameter(
-                name='id',
-                type=openapi.TYPE_INTEGER,
-                in_=openapi.IN_PATH,
-                description='A unique integer value identifying this project.',
-            ),
-        ]
-        + paginator_help('tasks', 'Projects')['manual_parameters'],
+                              openapi.Parameter(
+                                  name='id',
+                                  type=openapi.TYPE_INTEGER,
+                                  in_=openapi.IN_PATH,
+                                  description='A unique integer value identifying this project.',
+                              ),
+                          ]
+                          + paginator_help('tasks', 'Projects')['manual_parameters'],
     ),
 )
 class ProjectTaskListAPI(GetParentObjectMixin, generics.ListCreateAPIView, generics.DestroyAPIView):
