@@ -486,6 +486,9 @@ class TaskQuerySet(models.QuerySet):
         queryset = apply_filters(queryset, prepare_params.filters, project, request)
         queryset = apply_ordering(queryset, prepare_params.ordering, project, request, view_data=prepare_params.data)
 
+        if request.user.is_superuser is False and project.created_by != request.user and request.user.groups.filter(name='validator').exists() is False:
+            queryset = queryset.filter(file_upload__user=request.user)
+
         if not prepare_params.selectedItems:
             return queryset
 
@@ -753,4 +756,6 @@ class PreparedTaskManager(models.Manager):
 
 class TaskManager(models.Manager):
     def for_user(self, user):
+        if user.is_superuser:
+            return self.all()
         return self.filter(Q(project__memebers__user=user) | Q(project__created_by=user))

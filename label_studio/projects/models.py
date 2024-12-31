@@ -82,10 +82,9 @@ class ProjectManager(models.Manager):
     }
 
     def for_user(self, user):
-        return self.filter(
-            # Q(organization=user.active_organization) |
-            Q(created_by=user) | Q(
-                members__user=user))
+        if user.is_superuser:
+            return self.all()
+        return self.filter(Q(created_by=user) | Q(members__user=user))
 
     def with_counts(self, fields=None):
         return self.with_counts_annotate(self, fields=fields)

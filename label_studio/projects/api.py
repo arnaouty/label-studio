@@ -434,10 +434,10 @@ class ProjectAPI(generics.RetrieveUpdateDestroyAPIView):
         serializer = GetFieldsSerializer(data=self.request.query_params)
         serializer.is_valid(raise_exception=True)
         fields = serializer.validated_data.get('include')
-        return Project.objects.with_counts(fields=fields).filter(
-            # Q(organization=self.request.user.active_organization) |
-            Q(created_by=self.request.user) | Q(
-                members__user=self.request.user))
+        if self.request.user.is_superuser:
+            return Project.objects.with_counts(fields=fields)
+
+        return Project.objects.with_counts(fields=fields).filter(Q(created_by=self.request.user) | Q(members__user=self.request.user))
 
     def get(self, request, *args, **kwargs):
         return super(ProjectAPI, self).get(request, *args, **kwargs)
@@ -766,7 +766,14 @@ class ProjectTaskListAPI(GetParentObjectMixin, generics.ListCreateAPIView, gener
     def filter_queryset(self, queryset):
         project = generics.get_object_or_404(Project.objects.for_user(self.request.user), pk=self.kwargs.get('pk', 0))
         # ordering is deprecated here
-        tasks = Task.objects.filter(project=project).order_by('-updated_at')
+        tasks = Task.objects.filter(project=project,).order_by('-updated_at')
+        if self.request.user.groups.filter(name='validator').exists() is False:
+            tasks = tasks.filter(Q(project__memebers__user=self.request.user)| Q(file_upload__user=self.request.user))
+        elif self.request.user.is_superuser or project.created_by == self.request.user:
+            tasks = tasks
+        else:
+            tasks = tasks.filter(Q(file_upload__user=self.request.user))
+
         page = paginator(tasks, self.request)
         if page:
             return page

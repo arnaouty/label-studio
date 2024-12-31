@@ -50,6 +50,7 @@ class UserAdminShort(UserAdmin):
                     )
                 },
             ),
+            ('Groups', {'fields': ('groups',)}),
             ('Important dates', {'fields': ('last_login', 'date_joined')}),
         )
 

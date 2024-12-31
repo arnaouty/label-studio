@@ -178,7 +178,10 @@ class TaskListAPI(DMTaskListAPI):
         if self.request.user.is_superuser:
             return queryset
 
-        return queryset.filter(Q(project__memebers__user=self.request.user) | Q(project__created_by=self.request.user))
+        if self.request.user.groups.filter(name='validator').exists():
+            return queryset.filter(Q(project__memebers__user=self.request.user)| Q(file_upload__user=self.request.user) | Q(project__created_by=self.request.user))
+
+        return queryset.filter(Q(file_upload__user=self.request.user) | Q(project__created_by=self.request.user))
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
@@ -324,11 +327,15 @@ class TaskAPI(generics.RetrieveUpdateDestroyAPIView):
         project = self.request.query_params.get('project') or self.request.data.get('project')
         if not project:
             project = task.project.id
-        return self.prefetch(
-            Task.prepared.get_queryset(
-                prepare_params=PrepareParams(project=project, selectedItems=selected, request=self.request), **kwargs
-            )
-        )
+
+        get_queryset  = Task.prepared.get_queryset(prepare_params=PrepareParams(project=project, selectedItems=selected, request=self.request), **kwargs)
+        print(f'tasks api get_queryset: {get_queryset}')
+        if self.request.user.is_superuser or self.request.user.groups.filter(name='validator').exists() or self.request.user == project.created_by:
+            return self.prefetch(get_queryset)
+
+        get_queryset = get_queryset.filter(Q(file_upload__user=self.request.user) | Q(project__created_by=self.request.user))
+
+        return self.prefetch(get_queryset)
 
     def get_serializer_class(self):
         # GET => task + annotations + predictions + drafts
