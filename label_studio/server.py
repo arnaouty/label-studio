@@ -128,9 +128,9 @@ def _create_user(input_args, config):
     from organizations.models import Organization
     from users.models import User
 
-    username = input_args.username or config.get('username') or get_env('USERNAME')
-    password = input_args.password or config.get('password') or get_env('PASSWORD')
-    token = input_args.user_token or config.get('user_token') or get_env('USER_TOKEN')
+    username = input_args.username or config.get('username') or get_env('USERNAME',DEFAULT_USERNAME)
+    password = input_args.password or config.get('password') or get_env('PASSWORD',DEFAULT_USERNAME)
+    token = input_args.user_token or config.get('user_token') or get_env('USER_TOKEN',DEFAULT_USERNAME)
 
     if not username:
         user = User.objects.filter(email=DEFAULT_USERNAME).first()

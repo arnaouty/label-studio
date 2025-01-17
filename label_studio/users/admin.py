@@ -6,7 +6,7 @@ from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.models import Group
 from ml.models import MLBackend, MLBackendTrainJob
 from organizations.models import Organization, OrganizationMember
-from projects.models import Project
+from projects.models import Project, ProjectMember
 from tasks.models import Annotation, Prediction, Task
 from users.models import User
 
@@ -39,7 +39,7 @@ class UserAdminShort(UserAdmin):
 
         self.fieldsets = (
             (None, {'fields': ('password',)}),
-            ('Personal info', {'fields': ('email', 'username', 'first_name', 'last_name')}),
+            ('Personal info', {'fields': ('email', 'username', 'first_name', 'last_name','active_organization')}),
             (
                 'Permissions',
                 {
@@ -50,6 +50,7 @@ class UserAdminShort(UserAdmin):
                     )
                 },
             ),
+            ('Groups', {'fields': ('groups',)}),
             ('Important dates', {'fields': ('last_login', 'date_joined')}),
         )
 
@@ -72,6 +73,13 @@ class OrganizationMemberAdmin(admin.ModelAdmin):
         self.search_fields = ('user__email', 'organization__title')
         self.ordering = ('id',)
 
+class ProjectMemberAdmin(admin.ModelAdmin):
+    def __init__(self, *args, **kwargs):
+        super(ProjectMemberAdmin, self).__init__(*args, **kwargs)
+        self.list_display = ('id', 'user', 'project', 'created_at', 'updated_at')
+        self.search_fields = ('user__email', 'project__title')
+        self.ordering = ('id',)
+
 
 admin.site.register(User, UserAdminShort)
 admin.site.register(Project)
@@ -82,7 +90,8 @@ admin.site.register(Annotation)
 admin.site.register(Prediction)
 admin.site.register(Organization)
 admin.site.register(OrganizationMember, OrganizationMemberAdmin)
+admin.site.register(ProjectMember, ProjectMemberAdmin)
 admin.site.register(AsyncMigrationStatus, AsyncMigrationStatusAdmin)
 
 # remove unused django groups
-admin.site.unregister(Group)
+# admin.site.unregister(Group)

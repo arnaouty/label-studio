@@ -6,6 +6,8 @@ import traceback as tb
 from datetime import datetime
 from urllib.parse import urlparse
 
+from django.db.models import Q
+
 from core.feature_flags import flag_set
 from core.permissions import all_permissions
 from core.redis import start_job_async_or_sync
@@ -184,6 +186,9 @@ class ExportAPI(generics.RetrieveAPIView):
 
         logger.debug('Get tasks')
         query = Task.objects.filter(project=project)
+        if  self.request.user.is_superuser is False or project.created_by != self.request.user or self.request.user.groups.filter(name='validator').exists() is False:
+            query = query.filter(Q(file_upload__user=self.request.user))
+
         if tasks_ids and len(tasks_ids) > 0:
             logger.debug(f'Select only subset of {len(tasks_ids)} tasks')
             query = query.filter(id__in=tasks_ids)

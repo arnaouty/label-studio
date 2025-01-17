@@ -24,6 +24,8 @@ class Label(models.Model):
     organization = models.ForeignKey('organizations.Organization', related_name='labels', on_delete=models.CASCADE)
 
     def has_permission(self, user):
+        if user.is_superuser is True:
+            return True
         return self.organization_id == user.active_organization_id
 
     class Meta:
@@ -40,4 +42,6 @@ class LabelLink(models.Model):
 
     def has_permission(self, user):
         user.project = self.project  # link for activity log
+        if user.is_superuser is True or self.project.created_by == user:
+            return True
         return self.project.has_permission(user)

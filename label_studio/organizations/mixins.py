@@ -9,6 +9,6 @@ class OrganizationMixin:
 
 class OrganizationMemberMixin:
     def has_permission(self, user):
-        if user.active_organization_id == self.organization_id:
+        if user.is_superuser is True or self.members.filter(id=user.id).exists():
             return True
         return False
